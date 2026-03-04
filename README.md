@@ -39,7 +39,7 @@ pnpm dev
 2. Click "Login" (username defaults to `taken`)
 3. **Expected:** result shows `{ validationErrors: { _errors: ["Username is already taken"] } }`
 4. **Actual:** caught error "Server Action server validation error(s) occurred"
-
+5. Checkout branch `8.0.1-works`, with version 8.0.1, installed, and see that this works on that version, but not on the versions after.
 Check server terminal for the stack trace.
 
 ## Root cause
