@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "next": "16.1.6",
-    "next-safe-action": "^8.1.4",
+    "next-safe-action": "^8.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "zod": "^4.3.6"
