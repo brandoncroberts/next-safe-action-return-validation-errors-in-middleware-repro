@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# next-safe-action `returnValidationErrors` in middleware bug repro
 
-## Getting Started
+Minimal reproduction for a bug where `returnValidationErrors` called from a **middleware catch block** throws an unhandled `ActionServerValidationError` instead of returning `{ validationErrors: ... }` to the client.
 
-First, run the development server:
+## Affected versions
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+This bug was introduced **after version 8.0.1**. Version 8.0.1 works correctly. Versions 8.0.2+ (including latest 8.1.4) are affected.
+
+## The bug
+
+When `handleServerError` is configured to **rethrow** (a [documented pattern](https://next-safe-action.dev/docs/define-actions/create-the-client#handleservererror)), and a middleware wraps `next()` in a try/catch to convert domain errors into validation errors via `returnValidationErrors`, the action throws instead of returning validation errors.
+
+### Client error (browser console)
+
+```
+Error: Server Action server validation error(s) occurred
+    at handleSafeActionUniqueError (error.ts:8:34)
+    at <anonymous> (client.ts:118:43)
+    at <anonymous> (client.ts:71:22)
+    at <anonymous> (client.ts:55:11)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Server error (terminal)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+⨯ Error: Server Action server validation error(s) occurred
+    at returnValidationErrors (validation-errors.ts)
+    at <middleware catch block>
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Reproduce
 
-## Learn More
+```bash
+pnpm install
+pnpm dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+1. Open http://localhost:3000
+2. Click "Login" (username defaults to `taken`)
+3. **Expected:** result shows `{ validationErrors: { _errors: ["Username is already taken"] } }`
+4. **Actual:** caught error "Server Action server validation error(s) occurred"
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Check server terminal for the stack trace.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Root cause
 
-## Deploy on Vercel
+In `action-builder.ts`, the `serverErrorHandled` guard fires **before** the `instanceof ActionServerValidationError` check, causing the validation error to be re-thrown as an unhandled exception when `handleServerError` has already processed (and re-thrown) the original domain error.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Versions
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- next-safe-action: 8.1.4 (bug present in 8.0.2+, works in 8.0.1)
+- next: 16.x
+- zod: 4.x
